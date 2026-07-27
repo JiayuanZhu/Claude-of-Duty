@@ -481,13 +481,11 @@ export class RenderSystem {
       this.settings.adsVignette = 0.15;
       this.settings.sharpen = 0;
       this._applySettings();
-      // Without a depth prepass there is no depth texture to identify and
-      // de-weight sky pixels in the luminance meter. The sky is tens to hundreds
-      // of times brighter than any ground surface, so without this guard it
-      // dominates the log-average and the exposure collapses to near zero for
-      // everything below the horizon. Cap each metering tap so the sky
-      // contributes no more than a bright lit surface.
-      this.exposure.logPass.uniforms.uMeter.value.z = 1.5;
+      // Without a depth prepass, sky dominates the luminance meter and
+      // auto-exposure collapses to near-zero on ground surfaces.
+      // Fix: disable auto-exposure on mobile entirely; use fixed exposure.
+      this.settings.autoExposure = false;
+      this.settings.exposureBias = -1.0; // brighter than default
     }
 
     this.probe = new RenderProbeScene(this.rng.fork());
