@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <title>OVERWATCH — Tactical Shooter</title>
+    <style>
+      :root { color-scheme: dark; }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+      body { font-family: "Inter", "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+      #game { display: block; width: 100vw; height: 100vh; touch-action: none; cursor: none; }
+
+      /* ── Tap-to-Play start screen ─────────────────────────────────── */
+      #start-screen {
+        display: none;
+        position: fixed; inset: 0; z-index: 500;
+        background: linear-gradient(160deg, #0a0c10 0%, #111820 60%, #0a0c10 100%);
+        align-items: center; justify-content: center; flex-direction: column;
+        gap: 0;
+        user-select: none; -webkit-user-select: none;
+        touch-action: none;
+      }
+      #start-screen.visible { display: flex; }
+      .ss-title {
+        font-size: clamp(28px, 8vw, 56px);
+        font-weight: 900;
+        letter-spacing: 0.22em;
+        color: #e8e0cc;
+        text-shadow: 0 0 40px rgba(255,200,80,0.25);
+        margin-bottom: 0.15em;
+      }
+      .ss-sub {
+        font-size: clamp(11px, 3vw, 16px);
+        letter-spacing: 0.35em;
+        color: #8a7f6a;
+        margin-bottom: clamp(48px, 12vw, 96px);
+      }
+      .ss-tap {
+        font-size: clamp(13px, 3.5vw, 18px);
+        letter-spacing: 0.28em;
+        color: #c8b87a;
+        animation: pulse 2s ease-in-out infinite;
+        border: 1px solid rgba(200,184,122,0.4);
+        padding: 0.75em 2.2em;
+        border-radius: 2px;
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 0.6; }
+        50% { opacity: 1; }
+      }
+      .ss-corner {
+        position: absolute;
+        width: 18px; height: 18px;
+        border-color: rgba(200,184,122,0.35);
+        border-style: solid;
+      }
+      .ss-corner.tl { top: 20px; left: 20px; border-width: 2px 0 0 2px; }
+      .ss-corner.tr { top: 20px; right: 20px; border-width: 2px 2px 0 0; }
+      .ss-corner.bl { bottom: 20px; left: 20px; border-width: 0 0 2px 2px; }
+      .ss-corner.br { bottom: 20px; right: 20px; border-width: 0 2px 2px 0; }
+
+      /* ── Landscape / portrait prompt ──────────────────────────────── */
+      #orient-prompt {
+        display: none;
+        position: fixed; inset: 0; z-index: 600;
+        background: rgba(5,7,10,0.96);
+        align-items: center; justify-content: center; flex-direction: column;
+        gap: 20px;
+        user-select: none; -webkit-user-select: none;
+        touch-action: none;
+      }
+      #orient-prompt.visible { display: flex; }
+      .op-icon {
+        font-size: 56px;
+        animation: rotate-hint 2.4s ease-in-out infinite;
+        display: inline-block;
+      }
+      .op-text {
+        font-size: clamp(14px, 4vw, 20px);
+        letter-spacing: 0.2em;
+        color: #c8b87a;
+        text-align: center;
+      }
+      @keyframes rotate-hint {
+        0%, 40% { transform: rotate(0deg); }
+        60%, 100% { transform: rotate(-90deg); }
+      }
+    </style>
+    <script type="module" crossorigin src="./assets/index-B7nMIPJB.js"></script>
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+    <div id="ui"></div>
+
+<!-- Loading overlay for mobile -->
+    <div id="mobile-debug" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;font:16px/1.4 -apple-system,sans-serif;color:#fff;background:rgba(0,0,0,0.85);padding:16px 24px;border-radius:8px;text-align:center;pointer-events:none;display:none;">Loading...</div>
+    <script>
+      (function(){
+        var isMobile = /Mobi|Android|iPhone/i.test(navigator.userAgent) || ('ontouchstart' in window && window.innerWidth < 1024);
+        if (!isMobile) return;
+        var dbg = document.getElementById('mobile-debug');
+        dbg.style.display = 'block';
+        dbg.textContent = '\u23f3 Initializing...';
+        window.__MOBILE_DBG__ = function(msg) { dbg.textContent = msg; };
+        window.addEventListener('error', function(e) { dbg.textContent = '\u274c ' + (e.message||e).toString().slice(0,100); dbg.style.color='#f55'; });
+        var poll = setInterval(function(){
+          if(window.__READY__) {
+            dbg.textContent='\u2705 Ready! Tap to play';
+            clearInterval(poll);
+            var check = setInterval(function(){
+              if(window.__GAME_STARTED__) {
+                clearInterval(check);
+                setTimeout(function(){
+                  var gl = document.querySelector('canvas') && document.querySelector('canvas').getContext('webgl2');
+                  var err = gl ? gl.getError() : 'no gl';
+                  var r = window.__ENGINE__ && window.__ENGINE__.ctx && window.__ENGINE__.ctx.peek && window.__ENGINE__.ctx.peek('render');
+                  var info = r && r.renderer && r.renderer.info;
+                  var tris = (info && info.render && info.render.triangles) || 0;
+                  var calls = (info && info.render && info.render.calls) || 0;
+                  var progs = (info && info.programs && info.programs.length) || 0;
+                  if(tris > 0) {
+                    dbg.textContent='\ud83c\udfae ' + Math.round(tris/1000)+'k tris | '+calls+' draws';
+                    dbg.style.background='rgba(0,100,0,0.7)';
+                    setTimeout(function(){ dbg.style.display='none'; }, 5000);
+                  } else {
+                    dbg.textContent='\u26a0\ufe0f 0 tris | GL err='+err+' | progs='+progs;
+                    dbg.style.color='#ff5';
+                  }
+                }, 3000);
+              }
+            }, 500);
+          }
+        }, 300);
+      })();
+    </script>
+    </script>
+
+    <!-- Tap-to-Play (mobile only) -->
+    <div id="start-screen">
+      <div class="ss-corner tl"></div>
+      <div class="ss-corner tr"></div>
+      <div class="ss-corner bl"></div>
+      <div class="ss-corner br"></div>
+      <div class="ss-title">OVERWATCH</div>
+      <div class="ss-sub">TACTICAL SHOOTER</div>
+      <div class="ss-tap">TAP TO PLAY</div>
+    </div>
+
+    <!-- Portrait-mode warning (mobile only) -->
+    <div id="orient-prompt">
+      <div class="op-icon">📱</div>
+      <div class="op-text">ROTATE TO LANDSCAPE</div>
+    </div>
+
+    <script>
+      (function () {
+        const isMobile =
+          /Mobi|Android|iPhone/i.test(navigator.userAgent) ||
+          ('ontouchstart' in window && window.innerWidth < 1024);
+
+        if (!isMobile) return; // desktop: skip all of this
+
+        const startEl  = document.getElementById('start-screen');
+        const orientEl = document.getElementById('orient-prompt');
+
+        // ── Portrait detection ────────────────────────────────────────
+        function isPortrait() {
+          if (screen.orientation && screen.orientation.type) {
+            return screen.orientation.type.startsWith('portrait');
+          }
+          // Fallback: compare dimensions
+          return window.innerHeight > window.innerWidth;
+        }
+
+        function updateOrient() {
+          if (isPortrait()) {
+            orientEl.classList.add('visible');
+          } else {
+            orientEl.classList.remove('visible');
+          }
+        }
+
+        // ── Start screen ─────────────────────────────────────────────
+        // Show immediately (before engine loads) only in landscape.
+        // Portrait shows the rotate prompt instead; start screen appears
+        // once the user rotates.
+        if (!isPortrait()) {
+          startEl.classList.add('visible');
+        } else {
+          orientEl.classList.add('visible');
+        }
+
+        function onOrientChange() {
+          updateOrient();
+          // If they rotated into landscape and haven't tapped yet, show start screen
+          if (!isPortrait() && !window.__GAME_STARTED__) {
+            startEl.classList.add('visible');
+          }
+        }
+
+        if (screen.orientation) {
+          screen.orientation.addEventListener('change', onOrientChange);
+        }
+        window.addEventListener('orientationchange', onOrientChange);
+        window.addEventListener('resize', onOrientChange);
+
+        // ── Tap handler ───────────────────────────────────────────────
+        startEl.addEventListener('touchstart', function onTap(e) {
+          e.preventDefault();
+          startEl.classList.remove('visible');
+          window.__GAME_STARTED__ = true;
+
+          // Resume AudioContext if the audio system is already up
+          // (audio/index.js also listens for touchstart globally, so this
+          // is belt-and-suspenders — the audio system self-unlocks on any
+          // gesture including this one).
+          try {
+            const audio = window.__AUDIO__ || window.__ENGINE__?.ctx?.peek?.('audio');
+            if (audio?.actx?.state === 'suspended') {
+              audio.actx.resume().catch(function () {});
+            }
+          } catch (_) {}
+        }, { passive: false, once: true });
+      })();
+    </script>
+
+  </body>
+</html>
