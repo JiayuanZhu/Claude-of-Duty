@@ -1,6 +1,10 @@
 import * as THREE from 'three';
 import { box, blob, latheZ, rodZ, dome, extrude, roundRect, ring, mergeAll } from './geometry.js';
 
+/** Set true for mobile: halves lathe/sleeve segment counts. */
+let _simplified = false;
+export function setHandsSimplified(flag) { _simplified = !!flag; }
+
 /**
  * First-person arms.
  *
@@ -61,7 +65,7 @@ function segment(len, r0, r1) {
       [len, r1 * 0.35],
       [len, 0],
     ],
-    12
+    _simplified ? 6 : 12
   );
   g.scale(1, 0.88, 1); // fingers are wider than they are deep
   g.rotateY(Math.PI); // extend along -Z
@@ -342,7 +346,7 @@ function buildSleeve(material, len, r0, r1, opts = {}) {
    * silhouette — countable, and countable facets are exactly what the critique
    * measured. 32 takes it to 0.28 px, under the AA threshold.
    */
-  const SEG = 32;
+  const SEG = _simplified ? 12 : 32;
   /**
    * The shell profile is no longer a smooth cone. A sleeved forearm has three
    * things a cone does not: the fabric is loose so it bells slightly behind the
@@ -380,7 +384,7 @@ function buildSleeve(material, len, r0, r1, opts = {}) {
       [len + r1 * 0.8, r1 * 0.4],
       [len + r1 * 0.85, 0],
     ],
-    20
+    _simplified ? 8 : 20
   );
   joint.scale(1, 0.94, 1);
   parts.push(joint);

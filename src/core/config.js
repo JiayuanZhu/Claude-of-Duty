@@ -36,6 +36,13 @@ export const QUALITY_PRESETS = {
     // mobile-specific flags
     skipPrepass: true,
     reducedProps: true,
+    propDensity: 0.10,       // 10% of full prop density
+    noInstShadows: true,     // instanced props don't cast shadows
+    cameraFar: 55,           // clip plane at 55 m, culls distant prop buckets
+    simplifiedGeom: true,    // reduce cloth/cable subdivision on mobile
+    simplifiedHands: true,   // reduce sleeve/finger lathe segments
+    navCellScale: 2.0,       // 1.6 m nav cells (vs 0.8 m on desktop)
+    aiPathsPerFrame: 1,      // one A* solve per frame (vs 2)
     maxEnemies: 4,
     physicsHz: 60,
   },

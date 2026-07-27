@@ -111,7 +111,7 @@ export class AiSystem {
     /** A* solves allowed per frame. Measured: one solve is 0.5-1.1 ms on the
      *  221x221 grid, and a squad that all enters combat on the same frame used to
      *  ask for six of them at once. */
-    this.pathsPerFrame = 2;
+    this.pathsPerFrame = ctx.config.q?.aiPathsPerFrame ?? 2;
     this.stats.pathsDeferred = 0;
     this._frustum = new THREE.Frustum();
     this._mvp = new THREE.Matrix4();
@@ -422,7 +422,8 @@ export class AiSystem {
       new THREE.Box3(new THREE.Vector3(-70, -4, -70), new THREE.Vector3(70, 24, 70));
     bounds.expandByScalar(2);
     const t0 = performance.now();
-    this.grid = new NavGrid(phys, { bounds, cell: 0.8, radius: 0.36, height: 1.78 });
+    const cellScale = this.ctx.config.q?.navCellScale ?? 1;
+    this.grid = new NavGrid(phys, { bounds, cell: 0.8 * cellScale, radius: 0.36, height: 1.78 });
     this.grid.build();
     this.cover = new CoverMap(this.grid, phys);
     this.cover.build({ step: 1, reach: 1.3 });

@@ -82,6 +82,17 @@ export class Assembler {
      * own RNG so the remaining props still form a spatially coherent layout.
      */
     this.density = 1;
+    /**
+     * When true, instanced prop meshes skip shadow casting entirely, removing
+     * them from the CSM depth pass. Saves up to one full instanced-triangle
+     * budget per shadow cascade.
+     */
+    this.noInstShadows = false;
+    /**
+     * When true, geometry helpers in world/ use reduced subdivision counts
+     * (cloth segments, tube radial facets) to cut static triangle budget.
+     */
+    this.simplified = false;
     this.stats = { staticTris: 0, instTris: 0, instances: 0, drawCalls: 0, collideTris: 0 };
   }
 
@@ -367,7 +378,7 @@ export class Assembler {
       for (const list of buckets.values()) {
         const im = new THREE.InstancedMesh(p.geo, mat, list.length);
         im.name = `prop_${p.id}`;
-        im.castShadow = p.castShadow;
+        im.castShadow = p.castShadow && !this.noInstShadows;
         im.receiveShadow = p.receiveShadow;
         im.matrixAutoUpdate = false;
         im.userData.surface = this.surfaceOf(p.key);

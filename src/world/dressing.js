@@ -327,7 +327,8 @@ function jitterRig() {
 }
 
 // ================================================================== street ==
-export function dressStreet(A, rng) {
+export function dressStreet(A, rng, opts = {}) {
+  if (opts.simplified !== undefined) A.simplified = opts.simplified;
   // A FORK, not `rng` itself: drawing the jitter from the placement stream would
   // shift every subsequent position in the level and walk props into the shot
   // cameras' keepout zones.
@@ -660,8 +661,8 @@ function streetFloor(A, rng) {
     // and on some of them, a tarp thrown over the drums
     if (tallest && rng.float() < 0.55) {
       const cloth = clothGeometry(rng.range(1.0, 1.5), rng.range(0.9, 1.3), {
-        segX: 8,
-        segY: 8,
+        segX: A.simplified ? 4 : 8,
+        segY: A.simplified ? 3 : 8,
         sag: 0.22,
         wrinkle: 0.055,
         twist: 0.1,
@@ -1172,7 +1173,7 @@ function overheadLines(A, rng) {
     });
   };
   for (const [x0, y0, z0, x1, y1, z1, sag] of SET_PIECES.cables) {
-    const t = catenaryTube([x0, y0, z0], [x1, y1, z1], sag, 0.022, { seg: 14, radial: 4, jitter: 0.05 });
+    const t = catenaryTube([x0, y0, z0], [x1, y1, z1], sag, 0.022, { seg: A.simplified ? 5 : 14, radial: A.simplified ? 3 : 4, jitter: 0.05 });
     A.addOnce('metal_dark', t, null, { masks: [0.4, 0.7, 0.2] });
     // a second, thinner line running with it — never one lonely wire
     const t2 = catenaryTube(
@@ -1180,7 +1181,7 @@ function overheadLines(A, rng) {
       [x1, y1 - 0.18, z1 + 0.2],
       sag * 1.12,
       0.014,
-      { seg: 14, radial: 4, jitter: 0.06 }
+      { seg: A.simplified ? 5 : 14, radial: A.simplified ? 3 : 4, jitter: 0.06 }
     );
     A.addOnce('metal_dark', t2, null, { masks: [0.4, 0.7, 0.2] });
     insulator(x0, y0 + 0.06, z0);
@@ -1189,7 +1190,7 @@ function overheadLines(A, rng) {
 
   const SAG = 0.42;
   for (const [x0, y0, z0, x1, y1, z1] of SET_PIECES.laundry) {
-    const line = catenaryTube([x0, y0, z0], [x1, y1, z1], SAG, 0.012, { seg: 12, radial: 4 });
+    const line = catenaryTube([x0, y0, z0], [x1, y1, z1], SAG, 0.012, { seg: A.simplified ? 5 : 12, radial: A.simplified ? 3 : 4 });
     A.addOnce('metal_dark', line, null, { masks: [0.3, 0.6, 0.2] });
     const dx = x1 - x0;
     const dz = z1 - z0;
@@ -1208,8 +1209,8 @@ function overheadLines(A, rng) {
       const w = rng.range(0.72, 1.15);
       const h = rng.range(0.85, 1.45);
       const cloth = clothGeometry(w, h, {
-        segX: 9,
-        segY: 10,
+        segX: A.simplified ? 4 : 9,
+        segY: A.simplified ? 3 : 10,
         sag: rng.range(0.18, 0.3),
         wrinkle: rng.range(0.05, 0.085),
         rng,
@@ -1235,8 +1236,8 @@ function facadeHangings(A, rng) {
     // is also the one that most obviously reads as a sheet of glass if it has no
     // thickness, no hem and no slack. Heavy gauge, deep folds, frayed bottom.
     const cloth = clothGeometry(w, h, {
-      segX: 10,
-      segY: 10,
+      segX: A.simplified ? 4 : 10,
+      segY: A.simplified ? 3 : 10,
       sag: rng.range(0.09, 0.15),
       wrinkle: rng.range(0.04, 0.07),
       rng,
@@ -1256,8 +1257,8 @@ function facadeHangings(A, rng) {
     // a second, smaller rug beside it, half-rolled
     if (rng.float() < 0.6) {
       const c2 = clothGeometry(w * 0.55, h * 0.7, {
-        segX: 7,
-        segY: 8,
+        segX: A.simplified ? 4 : 7,
+        segY: A.simplified ? 3 : 8,
         sag: 0.12,
         wrinkle: 0.06,
         rng,
@@ -1407,7 +1408,8 @@ function coverClusters(A, rng) {
  * Facade services and roof clutter, driven by the anchors each building
  * returned while it was being generated.
  */
-export function dressBuildings(A, rng, infos) {
+export function dressBuildings(A, rng, infos, opts = {}) {
+  if (opts.simplified !== undefined) A.simplified = opts.simplified;
   A.jitter = jitterRig();
   for (const info of infos) dressBuilding(A, rng, info);
   alleyLines(A, rng, infos);
@@ -1446,13 +1448,13 @@ function dressBuilding(A, rng, info) {
     if (rng.float() < 0.18) {
       const a = worldOf(pm, wnd.x - wnd.w / 2 - 0.1, wnd.y + 0.5, -0.12).slice();
       const b = worldOf(pm, wnd.x + wnd.w / 2 + 0.1, wnd.y + 0.45, -0.12).slice();
-      const line = catenaryTube(a, b, 0.08, 0.008, { seg: 6, radial: 4 });
+      const line = catenaryTube(a, b, 0.08, 0.008, { seg: A.simplified ? 4 : 6, radial: A.simplified ? 3 : 4 });
       A.addOnce('metal_dark', line, null, { masks: [0.3, 0.6, 0] });
       for (let i = 0; i < 2; i++) {
         const t = 0.3 + i * 0.4;
         const cloth = clothGeometry(rng.range(0.3, 0.5), rng.range(0.4, 0.7), {
-          segX: 5,
-          segY: 6,
+          segX: A.simplified ? 3 : 5,
+          segY: A.simplified ? 2 : 6,
           sag: 0.1,
           wrinkle: rng.range(0.04, 0.065),
           twist: 0.1,
@@ -1496,8 +1498,8 @@ function dressBuilding(A, rng, info) {
     // rug over the railing — instantly reads as inhabited
     if (rng.float() < 0.55) {
       const cloth = clothGeometry(rng.range(0.8, 1.4), rng.range(0.7, 1.1), {
-        segX: 7,
-        segY: 7,
+        segX: A.simplified ? 4 : 7,
+        segY: A.simplified ? 3 : 7,
         sag: 0.09,
         wrinkle: rng.range(0.04, 0.07),
         thickness: 0.0034,
@@ -1625,7 +1627,7 @@ function dressBuilding(A, rng, info) {
   if (rs.w > 10 && rng.float() < 0.4) {
     const a = [rs.x - rs.w / 2 + 0.4, roofY + 1.0, rng.range(rz0, rz1)];
     const b = [rs.x + rs.w / 2 - 0.4, roofY + 0.96, rng.range(rz0, rz1)];
-    const line = catenaryTube(a, b, 0.3, 0.01, { seg: 10, radial: 4 });
+    const line = catenaryTube(a, b, 0.3, 0.01, { seg: A.simplified ? 5 : 10, radial: A.simplified ? 3 : 4 });
     A.addOnce('metal_dark', line, null, { masks: [0.3, 0.6, 0] });
     for (const sx of [-1, 1]) {
       A.add('metal_rust', BOX_FINE(A), LL(IDENT, rs.x + sx * (rs.w / 2 - 0.4), roofY + 0.9, a[2] + (sx > 0 ? b[2] - a[2] : 0), 0, 0.06, 1.8, 0.06), {
@@ -1636,8 +1638,8 @@ function dressBuilding(A, rng, info) {
     for (let i = 0; i < n; i++) {
       const t = (i + 0.5) / n;
       const cloth = clothGeometry(rng.range(0.5, 0.8), rng.range(0.45, 0.8), {
-        segX: 7,
-        segY: 8,
+        segX: A.simplified ? 4 : 7,
+        segY: A.simplified ? 3 : 8,
         sag: rng.range(0.12, 0.22),
         wrinkle: rng.range(0.045, 0.075),
         twist: rng.range(0.08, 0.18),
@@ -1692,14 +1694,14 @@ function alleyLines(A, rng, infos) {
     [8.6, 6.2, 2.2, 8.6, 5.8, 7.2],
   ];
   for (const [x0, y0, z0, x1, y1, z1] of spans) {
-    const t = catenaryTube([x0, y0, z0], [x1, y1, z1], 0.5, 0.016, { seg: 10, radial: 4, jitter: 0.04 });
+    const t = catenaryTube([x0, y0, z0], [x1, y1, z1], 0.5, 0.016, { seg: A.simplified ? 5 : 10, radial: A.simplified ? 3 : 4, jitter: 0.04 });
     A.addOnce('metal_dark', t, null, { masks: [0.4, 0.7, 0.2] });
     const n = rng.int(2, 4);
     for (let i = 0; i < n; i++) {
       const f = (i + 0.5) / n;
       const cloth = clothGeometry(rng.range(0.45, 0.8), rng.range(0.5, 1.0), {
-        segX: 6,
-        segY: 8,
+        segX: A.simplified ? 4 : 6,
+        segY: A.simplified ? 3 : 8,
         sag: rng.range(0.12, 0.22),
         wrinkle: rng.range(0.045, 0.075),
         twist: rng.range(0.08, 0.18),

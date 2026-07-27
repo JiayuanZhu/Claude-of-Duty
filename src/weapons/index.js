@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Rng } from '../core/rng.js';
 import { WeaponMaterials, ENV_OCCLUSION } from './materials.js';
 import { Viewmodel } from './viewmodel.js';
+import { setHandsSimplified } from './hands.js';
 import { ProjectileSim } from './ballistics.js';
 import { WEAPON_DEFS, buildRecoilPattern, SPREAD_MODS } from './defs.js';
 import { buildRifle } from './models/rifle.js';
@@ -134,6 +135,7 @@ export class WeaponSystem {
     this.rng = ctx.rng.fork();
     this.mats = new WeaponMaterials(ctx);
     this.sim = new ProjectileSim(ctx);
+    if (ctx.config.q?.simplifiedHands) setHandsSimplified(true);
     this.viewmodel = new Viewmodel(ctx, this.mats);
     // three only honours `material.envMapIntensity` when the material carries its
     // OWN `envMap`; for a material lit by `scene.environment` the renderer

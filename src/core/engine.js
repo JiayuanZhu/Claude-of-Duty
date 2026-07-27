@@ -26,7 +26,7 @@ export class Engine {
     this.rng = new Rng(config.deterministic ? 0x5eed1234 : (Math.random() * 2 ** 32) >>> 0);
 
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(config.fov, 1, 0.05, 1200);
+    this.camera = new THREE.PerspectiveCamera(config.fov, 1, 0.05, config.q?.cameraFar ?? 1200);
     this.camera.rotation.order = 'YXZ';
 
     /** Separate scene+camera for the first-person viewmodel, drawn with its own

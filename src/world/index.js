@@ -107,7 +107,11 @@ export class WorldSystem {
     this.A = A;
     A.setTransform(LEVEL_YAW, LEVEL_TX, LEVEL_TZ);
     const isMobile = ctx?.config?.q?.reducedProps;
-    if (isMobile) A.density = 0.25;
+    if (isMobile) {
+      A.density = ctx.config.q.propDensity ?? 0.25;
+      A.noInstShadows = ctx.config.q.noInstShadows ?? false;
+      A.simplified = ctx.config.q.simplifiedGeom ?? false;
+    }
 
     // 1. prototypes first: the level references them by id while it builds
     registerProps(A, rng);
@@ -129,16 +133,22 @@ export class WorldSystem {
     }
     this.buildings = infos;
 
+    const dressingOpts = { simplified: !!isMobile && !!(ctx.config.q?.simplifiedGeom) };
     buildGate(A, rng);
     buildPerimeter(A, rng);
-    dressStreet(A, rng);
-    dressBuildings(A, rng, infos);
+    dressStreet(A, rng, dressingOpts);
+    dressBuildings(A, rng, infos, dressingOpts);
     if (!isMobile) scatterDebris(A, rng);
 
     this._addLights(A);
 
     A.finalize(this.root, physics);
     A.releaseCache();
+
+    // Mobile: add linear scene fog so the 55 m camera clip is hidden.
+    if (isMobile) {
+      ctx.scene.fog = new THREE.Fog(0x8c7a5a, 35, 52);
+    }
 
     // -------------------------------------------------------------- queries --
     this._v = new THREE.Vector3();
