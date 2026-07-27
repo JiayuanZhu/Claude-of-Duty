@@ -36,11 +36,13 @@ export const QUALITY_PRESETS = {
     // mobile-specific flags
     skipPrepass: true,
     reducedProps: true,
-    propDensity: 0.02,       // 2% of full prop density
+    propDensity: 0.015,      // 1.5% of full prop density (cut triangles ~10%)
     noInstShadows: true,     // instanced props don't cast shadows
     noWorldShadows: true,    // world geometry skips CSM shadow pass
     staticChunk: 0,          // single merged mesh per material (far plane is 55m, chunking wastes draw calls)
     mobileInstChunk: 256,    // collapse all instances of a prop type into 1 draw call
+    mobileMinInstances: 10,  // skip prop types with fewer than this many instances (save draw calls)
+    skipShadowRender: true,  // skip CSM shadow pass on mobile (saves ~20 draw calls)
     cameraFar: 55,           // clip plane at 55 m, culls distant chunks
     simplifiedGeom: true,    // reduce cloth/cable subdivision on mobile
     simplifiedHands: true,   // reduce sleeve/finger lathe segments

@@ -53,8 +53,9 @@ export class MaterialSystem {
     const q = ctx?.config?.q;
     this._anisotropy = q?.anisotropy ?? 8;
     // Texture budget scales with the quality preset; 1K is the reference.
+    // Mobile is capped at 512 px (quality 0.5) — half of the 1K desktop atlas.
     this._quality =
-      ctx?.config?.quality === 'mobile' ? 0.25 :
+      ctx?.config?.quality === 'mobile' ? 0.5 :
       ctx?.config?.quality === 'low' ? 0.5 :
       ctx?.config?.quality === 'medium' ? 0.75 : 1;
     this._tryBuild();

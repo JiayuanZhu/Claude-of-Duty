@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Accum, trs } from './util.js';
+import { Accum, trs, plainBox } from './util.js';
 import { PALETTE } from './palette.js';
 
 /**
@@ -110,6 +110,12 @@ export class Assembler {
      * of a prop type into a single draw call.
      */
     this.mobileInstChunk = 0;
+    /**
+     * When > 0, prop types with fewer than this many total instances are
+     * dropped entirely (each type = 1 draw call, so eliminating rare types
+     * directly reduces draw call count on mobile).
+     */
+    this.mobileMinInstances = 0;
     /** Maps chunked storage key → palette key for the finalize pass. */
     this._staticMeta = new Map();
     this.stats = { staticTris: 0, instTris: 0, instances: 0, drawCalls: 0, collideTris: 0 };
@@ -194,11 +200,20 @@ export class Assembler {
    * Geometry cache for kit pieces that repeat (window frames, sills, steps).
    * Merged data is copied, so everything here is freed by releaseCache() once
    * the level is built.
+   *
+   * In simplified mode the three chamfer-box variants (44 tris each) are
+   * replaced by the flat plain box (12 tris) — saves ~30K triangles on the
+   * building facades without any visible change at mobile render scale.
    */
   cache(key, factory) {
     let g = this._geoCache.get(key);
     if (!g) {
-      g = factory();
+      if (this.simplified &&
+          (key === 'box:0.012' || key === 'box:0.004' || key === 'box:0.03')) {
+        g = plainBox();
+      } else {
+        g = factory();
+      }
       this._geoCache.set(key, g);
     }
     return g;
@@ -388,6 +403,13 @@ export class Assembler {
     for (const p of this._protos.values()) {
       const n = p.matrices.length;
       if (n === 0) {
+        p.geo.dispose();
+        continue;
+      }
+      // On mobile each prop type costs 1 draw call regardless of instance count.
+      // Drop types with too few instances to be worth a draw call; the visual
+      // gap at low density is imperceptible but saves 20-40 draw calls.
+      if (this.mobileMinInstances > 0 && n < this.mobileMinInstances) {
         p.geo.dispose();
         continue;
       }

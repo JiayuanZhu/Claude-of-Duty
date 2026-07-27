@@ -114,6 +114,7 @@ export class WorldSystem {
       A.noStaticShadows = ctx.config.q.noWorldShadows ?? false;
       A.staticChunk = ctx.config.q.staticChunk ?? 0;
       A.mobileInstChunk = ctx.config.q.mobileInstChunk ?? 0;
+      A.mobileMinInstances = ctx.config.q.mobileMinInstances ?? 0;
     }
 
     // 1. prototypes first: the level references them by id while it builds

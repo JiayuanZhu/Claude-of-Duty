@@ -1354,17 +1354,23 @@ export class RenderSystem {
     if (this._firstFrame) this._prevVP.copy(this._currVP);
 
     // ---- 2. cascaded shadow maps -----------------------------------------
+    // On mobile the shadow render is skipped entirely (saves ~20 draw calls).
+    // The shadow map stays clear (1.0 = no shadow) which is visually fine at
+    // 0.5x render scale where shadow details are sub-pixel anyway. We still
+    // call update() so sun-direction uniforms stay correct.
     const bg = scene.background;
     if (this.csm.enabled) {
       this.csm.update(camera, this.sunDir, this.settings.sunSoftness);
       this.csm.setJitter(this.taa ? this.frame % 8 : 0);
-      scene.background = null;
-      this._hideList(this._hide, this._nHide);
-      this._hideList(this._noShadow, this._nNoShadow);
-      this.csm.render(renderer, scene, this._noCascadeCull ? null : this._draw, this._nDraw);
-      this._showList(this._noShadow, this._nNoShadow);
-      this._showList(this._hide, this._nHide);
-      scene.background = bg;
+      if (!this.q.skipShadowRender) {
+        scene.background = null;
+        this._hideList(this._hide, this._nHide);
+        this._hideList(this._noShadow, this._nNoShadow);
+        this.csm.render(renderer, scene, this._noCascadeCull ? null : this._draw, this._nDraw);
+        this._showList(this._noShadow, this._nNoShadow);
+        this._showList(this._hide, this._nHide);
+        scene.background = bg;
+      }
     }
 
     // ---- 3. TAA jitter ----------------------------------------------------
