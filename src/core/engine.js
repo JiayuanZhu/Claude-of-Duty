@@ -83,8 +83,8 @@ export class Engine {
       const id = sys.constructor.id || 'system';
       // Update mobile loading screen
       if (window.__MOBILE_DBG__) {
-        const label = { render:'Renderer', materials:'Materials', sky:'Sky', world:'Map', physics:'Physics', player:'Player', weapons:'Weapons', fx:'Effects', ai:'AI', ui:'UI', audio:'Audio' }[id] || id;
-        window.__MOBILE_DBG__(`Loading ${label}... (${i+1}/${total})`);
+        const label = { render:'Initializing Graphics', materials:'Generating Textures', sky:'Building Sky', world:'Constructing Map', physics:'Setting Up Physics', player:'Spawning Player', weapons:'Forging Weapons', fx:'Loading Effects', ai:'Creating Characters', ui:'Initializing UI', audio:'Preparing Audio' }[id] || id;
+        window.__MOBILE_DBG__(`${label} (${i+1}/${total})`);
       }
       const t0 = performance.now();
       await sys.init?.(this.ctx);
