@@ -469,8 +469,12 @@ export class RenderSystem {
     };
     this._applySettings();
 
-    // Mobile: strip expensive lens effects to save fragment bandwidth.
+    // Mobile: disable CSM entirely — iOS Safari may reject the shadow
+    // texture format or produce black fragments when sampling an unrendered target.
     if (this._isMobile) {
+      this.csm.enabled = false;
+      this.settings.shadowStrength = 0;
+
       this.settings.chromatic = 0;
       this.settings.grain = 0;
       this.settings.vignette = 0.1;
