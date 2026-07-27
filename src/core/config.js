@@ -36,10 +36,10 @@ export const QUALITY_PRESETS = {
     // mobile-specific flags
     skipPrepass: true,
     reducedProps: true,
-    propDensity: 0.05,       // 5% of full prop density
+    propDensity: 0.02,       // 2% of full prop density
     noInstShadows: true,     // instanced props don't cast shadows
     noWorldShadows: true,    // world geometry skips CSM shadow pass
-    staticChunk: 32,         // split static world into 32 m spatial chunks for culling
+    staticChunk: 0,          // single merged mesh per material (far plane is 55m, chunking wastes draw calls)
     mobileInstChunk: 256,    // collapse all instances of a prop type into 1 draw call
     cameraFar: 55,           // clip plane at 55 m, culls distant chunks
     simplifiedGeom: true,    // reduce cloth/cable subdivision on mobile

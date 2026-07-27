@@ -79,7 +79,7 @@ export function facadeWall(A, pm, spec) {
     top: spec.top ?? 'flat',
     raggedAmp: spec.raggedAmp ?? 0.5,
     jag: spec.jag ?? 0,
-    curveSegments: 7,
+    curveSegments: spec.curveSegments ?? 7,
   });
   // Nothing perfectly flat: bow the face by a few millimetres.
   const warpAmp = spec.warp ?? 0.018;

@@ -250,22 +250,19 @@ export function buildBuilding(A, rng, spec) {
   }
 
   // ------------------------------------------------------------- drainpipe --
-  // A downpipe has to die into the wall it is clipped to. On a setback face the
-  // wall STOPS at the terrace, so a pipe run to the main roof height carries on
-  // three metres into open sky and reads as a floating mast — which is exactly
-  // what it was doing. Clamp the top to the parapet of whatever surface is
-  // actually above the pipe.
-  const dpSide = streetSide;
-  const pmD = panelMatrix(spec, dpSide, 0);
-  const len = sideLen(spec, dpSide);
-  const sbSide = spec.setback ? spec.setback.side ?? streetSide : -1;
-  const dpTop =
-    sbSide === dpSide
-      ? (info.floorY[spec.setback.from] ?? info.roofY) + 0.55
-      : info.roofY + 0.4;
-  drainpipe(A, pmD.clone(), rng.range(-len / 2 + 0.4, -len / 2 + 1.0), dpTop, dpTop, rng);
-  if (rng.float() < 0.6) {
-    drainpipe(A, pmD.clone(), rng.range(len / 2 - 1.0, len / 2 - 0.4), dpTop, dpTop, rng);
+  if (!A.simplified) {
+    const dpSide = streetSide;
+    const pmD = panelMatrix(spec, dpSide, 0);
+    const len = sideLen(spec, dpSide);
+    const sbSide = spec.setback ? spec.setback.side ?? streetSide : -1;
+    const dpTop =
+      sbSide === dpSide
+        ? (info.floorY[spec.setback.from] ?? info.roofY) + 0.55
+        : info.roofY + 0.4;
+    drainpipe(A, pmD.clone(), rng.range(-len / 2 + 0.4, -len / 2 + 1.0), dpTop, dpTop, rng);
+    if (rng.float() < 0.6) {
+      drainpipe(A, pmD.clone(), rng.range(len / 2 - 1.0, len / 2 - 0.4), dpTop, dpTop, rng);
+    }
   }
 
   return info;
@@ -368,10 +365,10 @@ function buildFacade(A, rng, spec, info, ctx) {
             broken,
             state: st,
             back: !spec.enterable,
-            grille: f === 0 && st !== 'boarded' && rng.float() < 0.55,
-            shutters: f > 0 && (st === 'shuttered' || rng.float() < 0.4),
+            grille: !A.simplified && f === 0 && st !== 'boarded' && rng.float() < 0.55,
+            shutters: !A.simplified && f > 0 && (st === 'shuttered' || rng.float() < 0.4),
             shutterKey: spec.shutterKey ?? rng.pick(['metal_blue', 'metal_green', 'wood_dark']),
-            curtain: st === 'curtain' || (st === 'glazed' && rng.float() < 0.25),
+            curtain: !A.simplified && (st === 'curtain' || (st === 'glazed' && rng.float() < 0.25)),
           })
         );
         info.windows.push({ side, f, x: bx, y: o.y, w: ww, h: wh, pm, state: st });
@@ -443,8 +440,10 @@ function buildFacade(A, rng, spec, info, ctx) {
     top: spec.ruin && isTop && (side === streetSide || side === spec.ruinSide) ? 'ragged' : 'flat',
     raggedAmp: 0.55,
     jag: isTop && !spec.ruin ? 0.03 : 0,
-    warp: 0.02,
-    paint: (x, wy, z, nx, ny, nz, out) => {
+    warp: A.simplified ? 0 : 0.02,
+    bevel: A.simplified ? 0 : undefined,
+    curveSegments: A.simplified ? 2 : 7,
+    paint: A.simplified ? null : (x, wy, z, nx, ny, nz, out) => {
       // extra grime toward the base of the ground floor and under the eaves
       const base = f === 0 ? Math.max(0, 1 - wy / 1.4) : 0;
       const n = fbm3(x * 0.7, wy * 0.7, z * 0.7, 2);
@@ -455,53 +454,48 @@ function buildFacade(A, rng, spec, info, ctx) {
 
   for (const fn of deco) fn();
 
-  // ---- rain runoff below every opening and ledge --------------------------
-  // The world knows where the water comes off: sills, shopfront heads, awning
-  // bars and balcony slabs. A facade with no runs below its openings reads as
-  // freshly painted, which is the one thing a street like this never is.
-  //
-  // Drawn from a stream keyed to this panel's identity rather than from `rng`, so
-  // adding or tuning the weathering never re-rolls the level's layout.
-  const wr = new Rng(
-    (Math.round((spec.x + 512) * 977 + (spec.z + 512) * 7919) ^ (side * 131 + f * 1237)) >>> 0
-  );
-  for (const o of openings) {
-    if (o.kind === 'ragged') continue;
-    const sillY = o.y - o.h / 2;
-    // Not every sill sheds the same amount, and a couple are bone dry.
-    if (wr.float() < 0.22) continue;
-    const run = Math.min(wr.range(0.7, 1.8), Math.max(0.25, sillY - 0.12));
-    const g = runoffStreak(wr, o.w * wr.range(0.6, 1.0), run, {
-      amount: wr.range(0.72, 1.0),
-    });
-    A.addOnce(wallKey, g, LL(pm, o.x + wr.range(-0.1, 0.1), sillY - 0.03, -0.012, 0, 1, 1, 1));
-    // a second, narrower run off one corner of the sill: water finds a low spot
-    if (wr.float() < 0.55) {
-      const sgn = wr.float() < 0.5 ? -1 : 1;
-      const run2 = Math.min(wr.range(0.5, 1.3), Math.max(0.2, sillY - 0.1));
-      const g2 = runoffStreak(wr, wr.range(0.1, 0.22), run2, { amount: wr.range(0.8, 1.0), cols: 3 });
+  if (!A.simplified) {
+    // ---- rain runoff below every opening and ledge ----
+    // Drawn from a stream keyed to this panel's identity rather than from `rng`, so
+    // adding or tuning the weathering never re-rolls the level's layout.
+    const wr = new Rng(
+      (Math.round((spec.x + 512) * 977 + (spec.z + 512) * 7919) ^ (side * 131 + f * 1237)) >>> 0
+    );
+    for (const o of openings) {
+      if (o.kind === 'ragged') continue;
+      const sillY = o.y - o.h / 2;
+      if (wr.float() < 0.22) continue;
+      const run = Math.min(wr.range(0.7, 1.8), Math.max(0.25, sillY - 0.12));
+      const g = runoffStreak(wr, o.w * wr.range(0.6, 1.0), run, {
+        amount: wr.range(0.72, 1.0),
+      });
+      A.addOnce(wallKey, g, LL(pm, o.x + wr.range(-0.1, 0.1), sillY - 0.03, -0.012, 0, 1, 1, 1));
+      if (wr.float() < 0.55) {
+        const sgn = wr.float() < 0.5 ? -1 : 1;
+        const run2 = Math.min(wr.range(0.5, 1.3), Math.max(0.2, sillY - 0.1));
+        const g2 = runoffStreak(wr, wr.range(0.1, 0.22), run2, { amount: wr.range(0.8, 1.0), cols: 3 });
+        A.addOnce(
+          wallKey,
+          g2,
+          LL(pm, o.x + sgn * o.w * wr.range(0.32, 0.5), sillY - 0.02, -0.013, 0, 1, 1, 1)
+        );
+      }
+    }
+    if (openFace && wr.float() < 0.8) {
+      const g = runoffStreak(wr, wr.range(0.18, 0.4), wr.range(1.0, 1.8), {
+        amount: wr.range(0.78, 1.0),
+        cols: 4,
+      });
       A.addOnce(
         wallKey,
-        g2,
-        LL(pm, o.x + sgn * o.w * wr.range(0.32, 0.5), sillY - 0.02, -0.013, 0, 1, 1, 1)
+        g,
+        LL(pm, wr.range(-len / 2 + 0.4, len / 2 - 0.4), h - 0.16, -0.012, 0, 1, 1, 1)
       );
     }
   }
-  // and one long run off the string course / cornice per open facade
-  if (openFace && wr.float() < 0.8) {
-    const g = runoffStreak(wr, wr.range(0.18, 0.4), wr.range(1.0, 1.8), {
-      amount: wr.range(0.78, 1.0),
-      cols: 4,
-    });
-    A.addOnce(
-      wallKey,
-      g,
-      LL(pm, wr.range(-len / 2 + 0.4, len / 2 - 0.4), h - 0.16, -0.012, 0, 1, 1, 1)
-    );
-  }
 
   // ---- string course between floors ----
-  if (f < ctx.floors - 1 && (openFace || rng.float() < 0.5)) {
+  if (!A.simplified && f < ctx.floors - 1 && (openFace || rng.float() < 0.5)) {
     A.add(
       spec.trimKey ?? 'concrete',
       BOX_SOFT(A),
@@ -510,7 +504,7 @@ function buildFacade(A, rng, spec, info, ctx) {
     );
   }
   // ---- top cornice ----
-  if (f === ctx.floors - 1 && !spec.ruin) {
+  if (!A.simplified && f === ctx.floors - 1 && !spec.ruin) {
     A.add(
       spec.trimKey ?? 'concrete',
       BOX_SOFT(A),
@@ -521,26 +515,22 @@ function buildFacade(A, rng, spec, info, ctx) {
 
   // ---- damage: spalled render exposing brick, bullet-pocked plaster ----
   const dmg = spec.damage ?? 0.2;
-  const spalls = Math.round(dmg * 5 * (openFace ? 1.4 : 0.7));
+  const spalls = Math.round(dmg * (A.simplified ? 1 : 5) * (openFace ? 1.4 : 0.7));
   for (let i = 0; i < spalls; i++) {
     const sx = rng.range(-len / 2 + 0.5, len / 2 - 0.5);
     const sy = rng.range(0.4, h - 0.5);
     const g = spallPatch(rng, rng.range(0.35, 1.0), rng.range(0.3, 0.8), 0.03);
     A.addOnce('brick_fine', g, LL(pm, sx, sy, 0.01, 0, 1, 1, 1));
   }
-  // patched render — a slightly different mix where somebody repaired it. Kept
-  // in the same value family as the wall, or it reads as a paper poster.
-  if (openFace && rng.float() < 0.5) {
+  if (!A.simplified && openFace && rng.float() < 0.5) {
     const px = rng.range(-len / 2 + 1, len / 2 - 1);
     const py = rng.range(0.5, h - 1.2);
     const g = spallPatch(rng, rng.range(0.6, 1.4), rng.range(0.5, 1.1), 0.02);
-    // Same value family as the wall: a bright white patch on cream render reads
-    // as a sheet of paper stuck to the building.
     A.addOnce(PATCH_KEY[wallKey] ?? 'plaster_sand', g, LL(pm, px, py, 0.013, 0, 1, 1, 1));
   }
 
   // ---- bullet pocks, clustered where somebody took cover ----
-  if (A.has('pock')) {
+  if (!A.simplified && A.has('pock')) {
     const bursts = Math.round(dmg * 6) + (openFace ? 2 : 0);
     for (let i = 0; i < bursts; i++) {
       const cx = rng.range(-len / 2 + 0.4, len / 2 - 0.4);

@@ -19,7 +19,7 @@ export function buildGround(A, rng) {
   // Sandy ground under everything, gently undulating so the horizon isn't a
   // ruler-straight line where it meets the buildings.
   const S = 168;
-  const N = 42;
+  const N = A.simplified ? 16 : 42;
   const terrain = new THREE.PlaneGeometry(S, S, N, N);
   terrain.rotateX(-Math.PI / 2);
   const pa = terrain.getAttribute('position');
@@ -41,7 +41,7 @@ export function buildGround(A, rng) {
 
   // ---------------------------------------------------------------- road --
   const roadLen = zMax - zMin;
-  const road = new THREE.PlaneGeometry(HW * 2, roadLen, 12, Math.round(roadLen / 2));
+  const road = new THREE.PlaneGeometry(HW * 2, roadLen, A.simplified ? 6 : 12, Math.round(roadLen / (A.simplified ? 8 : 2)));
   road.rotateX(-Math.PI / 2);
   const rp = road.getAttribute('position');
   for (let i = 0; i < rp.count; i++) {
@@ -66,7 +66,7 @@ export function buildGround(A, rng) {
 
   // Old tarmac showing through the dust where wheels have polished it: long
   // patches in the ruts, and a scatter of intact pavement elsewhere.
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < (A.simplified ? 8 : 30); i++) {
     const rut = rng.float() < 0.62;
     const x = rut ? (rng.float() < 0.5 ? -1 : 1) * rng.range(1.2, 2.1) : rng.range(-HW + 0.5, HW - 0.5);
     const z = rng.range(zMin + 2, zMax - 2);
@@ -207,29 +207,31 @@ export function buildGround(A, rng) {
       }
     }
   };
-  // The gutter: wind-blown sand and grit piles against the kerb on the road side,
-  // which is what actually hides the value step where the road surface meets the
-  // pavement in a low camera. This is the seam the eye lands on first in any
-  // street-level frame.
-  seam(-HW + 0.08, zMin + 2, -HW + 0.08, zMax - 2, 'sand', 'road_dust', 0.012);
-  seam(HW - 0.08, zMin + 2, HW - 0.08, zMax - 2, 'sand', 'road_dust', 0.012);
-  // the pavement / open-ground line down both sides of the street, and the
-  // perimeter of every alley and courtyard where its floor meets the sand
-  seam(-KB, zMin + 2, -KB, zMax - 2, 'concrete', 'sand', WH + 0.004);
-  seam(KB, zMin + 2, KB, zMax - 2, 'concrete', 'sand', WH + 0.004);
-  for (const a of ALLEYS) {
-    const [ax0, az0, ax1, az1] = a.rect;
-    const ay = 0.062;
-    seam(ax0, az0, ax1, az0, a.surface, 'sand', ay);
-    seam(ax0, az1, ax1, az1, a.surface, 'sand', ay);
-    seam(ax0, az0, ax0, az1, a.surface, 'sand', ay);
-    seam(ax1, az0, ax1, az1, a.surface, 'sand', ay);
+  if (!A.simplified) {
+    // The gutter: wind-blown sand and grit piles against the kerb on the road side,
+    // which is what actually hides the value step where the road surface meets the
+    // pavement in a low camera. This is the seam the eye lands on first in any
+    // street-level frame.
+    seam(-HW + 0.08, zMin + 2, -HW + 0.08, zMax - 2, 'sand', 'road_dust', 0.012);
+    seam(HW - 0.08, zMin + 2, HW - 0.08, zMax - 2, 'sand', 'road_dust', 0.012);
+    // the pavement / open-ground line down both sides of the street, and the
+    // perimeter of every alley and courtyard where its floor meets the sand
+    seam(-KB, zMin + 2, -KB, zMax - 2, 'concrete', 'sand', WH + 0.004);
+    seam(KB, zMin + 2, KB, zMax - 2, 'concrete', 'sand', WH + 0.004);
+    for (const a of ALLEYS) {
+      const [ax0, az0, ax1, az1] = a.rect;
+      const ay = 0.062;
+      seam(ax0, az0, ax1, az0, a.surface, 'sand', ay);
+      seam(ax0, az1, ax1, az1, a.surface, 'sand', ay);
+      seam(ax0, az0, ax0, az1, a.surface, 'sand', ay);
+      seam(ax1, az0, ax1, az1, a.surface, 'sand', ay);
+    }
   }
 
   // ------------------------------------------- drifts, stains and covers --
   // Sand blown against the kerbs and building lines: the single cheapest thing
   // that stops a street reading as a clean box of geometry.
-  for (let i = 0; i < 130; i++) {
+  for (let i = 0; i < (A.simplified ? 35 : 130); i++) {
     const side = rng.float() < 0.5 ? -1 : 1;
     const againstWall = rng.float() < 0.55;
     const x = againstWall
@@ -248,7 +250,7 @@ export function buildGround(A, rng) {
       masks: [0.15, 0.5, 0.3],
     });
   }
-  for (let i = 0; i < 26; i++) {
+  for (let i = 0; i < (A.simplified ? 6 : 26); i++) {
     const g = patchGeometry(rng, rng.range(0.5, 1.8), { lobes: 10, wobble: 0.6 });
     const px = rng.range(-HW + 0.4, HW - 0.4);
     A.addOnce(
@@ -258,29 +260,31 @@ export function buildGround(A, rng) {
       { masks: [0.1, 0.85, 0.5] }
     );
   }
-  // manholes and gully gratings
-  for (let i = 0; i < 7; i++) {
-    const z = rng.range(zMin + 6, zMax - 6);
-    const x = rng.range(-2.5, 2.5);
-    const ring = A.cache('manhole', () => {
-      const g = new THREE.CylinderGeometry(0.36, 0.36, 0.04, 18, 1);
-      paintMasks(g, (px, py, pz, nx, ny, nz, out) => {
-        out[0] = ny > 0.5 ? 0.95 : 0.4;
-        out[1] = 0.55;
+  if (!A.simplified) {
+    // manholes and gully gratings
+    for (let i = 0; i < 7; i++) {
+      const z = rng.range(zMin + 6, zMax - 6);
+      const x = rng.range(-2.5, 2.5);
+      const ring = A.cache('manhole', () => {
+        const g = new THREE.CylinderGeometry(0.36, 0.36, 0.04, 18, 1);
+        paintMasks(g, (px, py, pz, nx, ny, nz, out) => {
+          out[0] = ny > 0.5 ? 0.95 : 0.4;
+          out[1] = 0.55;
+        });
+        return g;
       });
-      return g;
-    });
-    A.add('metal_dark', ring, LL(IDENT, x, 0.035 + (1 - (x / HW) ** 2) * 0.05, z, rng.float() * 6.28, 1, 1, 1));
-  }
-  for (const side of [-1, 1]) {
-    for (let i = 0; i < 5; i++) {
-      const z = rng.range(zMin + 8, zMax - 8);
-      A.add(
-        'metal_dark',
-        BOX(A),
-        LL(IDENT, side * (HW - 0.22), WH - 0.03, z, 0, 0.42, 0.05, 0.62),
-        { masks: [0.7, 0.8, 0.6] }
-      );
+      A.add('metal_dark', ring, LL(IDENT, x, 0.035 + (1 - (x / HW) ** 2) * 0.05, z, rng.float() * 6.28, 1, 1, 1));
+    }
+    for (const side of [-1, 1]) {
+      for (let i = 0; i < 5; i++) {
+        const z = rng.range(zMin + 8, zMax - 8);
+        A.add(
+          'metal_dark',
+          BOX(A),
+          LL(IDENT, side * (HW - 0.22), WH - 0.03, z, 0, 0.42, 0.05, 0.62),
+          { masks: [0.7, 0.8, 0.6] }
+        );
+      }
     }
   }
 }
