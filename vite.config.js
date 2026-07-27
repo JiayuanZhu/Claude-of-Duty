@@ -13,7 +13,7 @@ export default defineConfig({
     hmr: process.env.OW_NO_HMR ? false : undefined,
   },
   preview: { host: '127.0.0.1' },
-  base: process.env.VITE_BASE ?? '/',
+  base: './',
   build: { target: 'es2022', sourcemap: true, chunkSizeWarningLimit: 4096 },
   // Large binary game assets served verbatim.
   assetsInclude: ['**/*.ktx2', '**/*.hdr', '**/*.exr', '**/*.bin', '**/*.glb'],
