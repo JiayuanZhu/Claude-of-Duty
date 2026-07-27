@@ -77,11 +77,19 @@ export class Engine {
 
   async init() {
     const order = this.registry.resolve();
-    for (const sys of order) {
+    const total = order.length;
+    for (let i = 0; i < total; i++) {
+      const sys = order[i];
+      const id = sys.constructor.id || 'system';
+      // Update mobile loading screen
+      if (window.__MOBILE_DBG__) {
+        const label = { render:'Renderer', materials:'Materials', sky:'Sky', world:'Map', physics:'Physics', player:'Player', weapons:'Weapons', fx:'Effects', ai:'AI', ui:'UI', audio:'Audio' }[id] || id;
+        window.__MOBILE_DBG__(`Loading ${label}... (${i+1}/${total})`);
+      }
       const t0 = performance.now();
       await sys.init?.(this.ctx);
       const ms = performance.now() - t0;
-      if (ms > 50) console.info(`[engine] ${sys.constructor.id} init ${ms.toFixed(0)}ms`);
+      if (ms > 50) console.info(`[engine] ${id} init ${ms.toFixed(0)}ms`);
     }
     this.input.attach();
     addEventListener('resize', this._onResize);

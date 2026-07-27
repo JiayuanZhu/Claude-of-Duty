@@ -92,40 +92,47 @@
     <canvas id="game"></canvas>
     <div id="ui"></div>
 
-    <!-- Debug overlay for mobile (shows loading status) -->
-    <div id="mobile-debug" style="position:fixed;bottom:8px;left:8px;z-index:9999;font:11px/1.3 monospace;color:#0f0;background:rgba(0,0,0,0.7);padding:4px 8px;border-radius:4px;pointer-events:none;display:none;">Loading...</div>
+<!-- Loading overlay for mobile -->
+    <div id="mobile-debug" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;font:16px/1.4 -apple-system,sans-serif;color:#fff;background:rgba(0,0,0,0.85);padding:16px 24px;border-radius:8px;text-align:center;pointer-events:none;display:none;">Loading...</div>
     <script>
       (function(){
         var isMobile = /Mobi|Android|iPhone/i.test(navigator.userAgent) || ('ontouchstart' in window && window.innerWidth < 1024);
         if (!isMobile) return;
         var dbg = document.getElementById('mobile-debug');
         dbg.style.display = 'block';
-        dbg.textContent = 'Loading engine...';
-        var t0 = Date.now();
-        window.__MOBILE_DBG__ = function(msg) { dbg.textContent = msg + ' (' + ((Date.now()-t0)/1000).toFixed(1) + 's)'; };
-        window.addEventListener('error', function(e) { dbg.textContent = 'ERROR: ' + (e.message||e).toString().slice(0,80); dbg.style.color='#f55'; });
-        // Poll for __READY__
+        dbg.textContent = '\u23f3 Initializing...';
+        window.__MOBILE_DBG__ = function(msg) { dbg.textContent = msg; };
+        window.addEventListener('error', function(e) { dbg.textContent = '\u274c ' + (e.message||e).toString().slice(0,100); dbg.style.color='#f55'; });
         var poll = setInterval(function(){
           if(window.__READY__) {
-            dbg.textContent='Ready! Tap to play';
+            dbg.textContent='\u2705 Ready! Tap to play';
             clearInterval(poll);
-            // After tap, monitor for black screen
-            setTimeout(function(){
-              var canvas = document.querySelector('canvas');
-              var gl = canvas && canvas.getContext('webgl2');
-              if(gl) {
-                var err = gl.getError();
-                if(err) dbg.textContent='GL ERROR: '+err;
-                // Check programs for link errors
-                var info = window.__ENGINE__?.ctx?.peek?.('render')?.renderer?.info;
-                dbg.textContent='Progs:'+( info?.programs?.length||'?')+' Tris:'+(info?.render?.triangles||0)+' Calls:'+(info?.render?.calls||0)+' Err:'+err;
-                dbg.style.display='block';
+            var check = setInterval(function(){
+              if(window.__GAME_STARTED__) {
+                clearInterval(check);
+                setTimeout(function(){
+                  var gl = document.querySelector('canvas') && document.querySelector('canvas').getContext('webgl2');
+                  var err = gl ? gl.getError() : 'no gl';
+                  var r = window.__ENGINE__ && window.__ENGINE__.ctx && window.__ENGINE__.ctx.peek && window.__ENGINE__.ctx.peek('render');
+                  var info = r && r.renderer && r.renderer.info;
+                  var tris = (info && info.render && info.render.triangles) || 0;
+                  var calls = (info && info.render && info.render.calls) || 0;
+                  var progs = (info && info.programs && info.programs.length) || 0;
+                  if(tris > 0) {
+                    dbg.textContent='\ud83c\udfae ' + Math.round(tris/1000)+'k tris | '+calls+' draws';
+                    dbg.style.background='rgba(0,100,0,0.7)';
+                    setTimeout(function(){ dbg.style.display='none'; }, 5000);
+                  } else {
+                    dbg.textContent='\u26a0\ufe0f 0 tris | GL err='+err+' | progs='+progs;
+                    dbg.style.color='#ff5';
+                  }
+                }, 3000);
               }
-            }, 4000);
+            }, 500);
           }
-          else if(window.__ENGINE__) { dbg.textContent='Engine loading... ' + ((Date.now()-t0)/1000).toFixed(1)+'s'; }
-        }, 500);
+        }, 300);
       })();
+    </script>
     </script>
 
     <!-- Tap-to-Play (mobile only) -->
