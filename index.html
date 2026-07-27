@@ -92,6 +92,26 @@
     <canvas id="game"></canvas>
     <div id="ui"></div>
 
+    <!-- Debug overlay for mobile (shows loading status) -->
+    <div id="mobile-debug" style="position:fixed;bottom:8px;left:8px;z-index:9999;font:11px/1.3 monospace;color:#0f0;background:rgba(0,0,0,0.7);padding:4px 8px;border-radius:4px;pointer-events:none;display:none;">Loading...</div>
+    <script>
+      (function(){
+        var isMobile = /Mobi|Android|iPhone/i.test(navigator.userAgent) || ('ontouchstart' in window && window.innerWidth < 1024);
+        if (!isMobile) return;
+        var dbg = document.getElementById('mobile-debug');
+        dbg.style.display = 'block';
+        dbg.textContent = 'Loading engine...';
+        var t0 = Date.now();
+        window.__MOBILE_DBG__ = function(msg) { dbg.textContent = msg + ' (' + ((Date.now()-t0)/1000).toFixed(1) + 's)'; };
+        window.addEventListener('error', function(e) { dbg.textContent = 'ERROR: ' + (e.message||e).toString().slice(0,80); dbg.style.color='#f55'; });
+        // Poll for __READY__
+        var poll = setInterval(function(){
+          if(window.__READY__) { dbg.textContent='Ready! Tap to play'; setTimeout(function(){dbg.style.display='none';},10000); clearInterval(poll); }
+          else if(window.__ENGINE__) { dbg.textContent='Engine loading... ' + ((Date.now()-t0)/1000).toFixed(1)+'s'; }
+        }, 500);
+      })();
+    </script>
+
     <!-- Tap-to-Play (mobile only) -->
     <div id="start-screen">
       <div class="ss-corner tl"></div>
