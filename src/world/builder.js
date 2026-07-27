@@ -375,6 +375,8 @@ export class Assembler {
       mesh.matrixAutoUpdate = false;
       mesh.userData.surface = this.surfaceOf(paletteKey);
       mesh.userData.collision = false; // proxies own collision
+      // owNoShadow tells the custom CSM to exclude this mesh from the shadow pass
+      if (this.noStaticShadows) mesh.userData.owNoShadow = true;
       mesh.updateMatrix();
       root.add(mesh);
       this.meshes.push(mesh);
@@ -415,6 +417,8 @@ export class Assembler {
         im.userData.surface = this.surfaceOf(p.key);
         im.userData.collision = false;
         if (p.noPrepass) im.userData.owNoPrepass = true;
+        // owNoShadow tells the custom CSM to exclude instanced props from the shadow pass
+        if (this.noInstShadows) im.userData.owNoShadow = true;
         let needColor = false;
         for (let j = 0; j < list.length; j++) if (p.masks[list[j]]) needColor = true;
         if (needColor) {
