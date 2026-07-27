@@ -46,9 +46,11 @@ export class CascadedShadowMaps {
     // sampler2DArray requirement (more compatible with iOS WebGL2 drivers).
     this.use2D = this.cascades === 1;
     if (this.use2D) {
+      // iOS Safari: RedFormat + HalfFloat may not be renderable.
+      // Use RGBAFormat + UnsignedByteType for maximum compatibility.
       this.rt = new THREE.WebGLRenderTarget(this.mapSize, this.mapSize, {
-        type: THREE.HalfFloatType,
-        format: THREE.RedFormat,
+        type: THREE.UnsignedByteType,
+        format: THREE.RGBAFormat,
         minFilter: THREE.NearestFilter,
         magFilter: THREE.NearestFilter,
         wrapS: THREE.ClampToEdgeWrapping,

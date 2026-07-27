@@ -106,7 +106,23 @@
         window.addEventListener('error', function(e) { dbg.textContent = 'ERROR: ' + (e.message||e).toString().slice(0,80); dbg.style.color='#f55'; });
         // Poll for __READY__
         var poll = setInterval(function(){
-          if(window.__READY__) { dbg.textContent='Ready! Tap to play'; setTimeout(function(){dbg.style.display='none';},10000); clearInterval(poll); }
+          if(window.__READY__) {
+            dbg.textContent='Ready! Tap to play';
+            clearInterval(poll);
+            // After tap, monitor for black screen
+            setTimeout(function(){
+              var canvas = document.querySelector('canvas');
+              var gl = canvas && canvas.getContext('webgl2');
+              if(gl) {
+                var err = gl.getError();
+                if(err) dbg.textContent='GL ERROR: '+err;
+                // Check programs for link errors
+                var info = window.__ENGINE__?.ctx?.peek?.('render')?.renderer?.info;
+                dbg.textContent='Progs:'+( info?.programs?.length||'?')+' Tris:'+(info?.render?.triangles||0)+' Calls:'+(info?.render?.calls||0)+' Err:'+err;
+                dbg.style.display='block';
+              }
+            }, 4000);
+          }
           else if(window.__ENGINE__) { dbg.textContent='Engine loading... ' + ((Date.now()-t0)/1000).toFixed(1)+'s'; }
         }, 500);
       })();
