@@ -111,6 +111,9 @@ export class WorldSystem {
       A.density = ctx.config.q.propDensity ?? 0.25;
       A.noInstShadows = ctx.config.q.noInstShadows ?? false;
       A.simplified = ctx.config.q.simplifiedGeom ?? false;
+      A.noStaticShadows = ctx.config.q.noWorldShadows ?? false;
+      A.staticChunk = ctx.config.q.staticChunk ?? 0;
+      A.mobileInstChunk = ctx.config.q.mobileInstChunk ?? 0;
     }
 
     // 1. prototypes first: the level references them by id while it builds

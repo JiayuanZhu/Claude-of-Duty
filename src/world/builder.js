@@ -93,6 +93,25 @@ export class Assembler {
      * (cloth segments, tube radial facets) to cut static triangle budget.
      */
     this.simplified = false;
+    /**
+     * When true, static world geometry is excluded from the CSM shadow pass,
+     * halving its contribution to renderer.info.render.triangles on mobile.
+     */
+    this.noStaticShadows = false;
+    /**
+     * When > 0, static geometry is split into spatial chunks of this size (m)
+     * so THREE.js frustum culling can hide distant world chunks behind the
+     * camera far plane. 0 = single merged batch (desktop default).
+     */
+    this.staticChunk = 0;
+    /**
+     * When > 0, instanced prop spatial buckets use this size (m) instead of
+     * CHUNK. A value larger than the map (e.g. 256) collapses all instances
+     * of a prop type into a single draw call.
+     */
+    this.mobileInstChunk = 0;
+    /** Maps chunked storage key → palette key for the finalize pass. */
+    this._staticMeta = new Map();
     this.stats = { staticTris: 0, instTris: 0, instances: 0, drawCalls: 0, collideTris: 0 };
   }
 
@@ -147,12 +166,22 @@ export class Assembler {
   // --------------------------------------------------------- static batch --
   /** Merge a transformed geometry into the batch for `key`. */
   add(key, geo, matrix = null, opts = null) {
-    let a = this._static.get(key);
-    if (!a) {
-      a = new Accum(`world:${key}`);
-      this._static.set(key, a);
+    const wm = this._x(matrix);
+    let sk = key;
+    if (this.staticChunk > 0) {
+      const wx = wm ? wm.elements[12] : 0;
+      const wz = wm ? wm.elements[14] : 0;
+      const cx = Math.floor(wx / this.staticChunk);
+      const cz = Math.floor(wz / this.staticChunk);
+      sk = `${key}:${cx}|${cz}`;
+      if (!this._staticMeta.has(sk)) this._staticMeta.set(sk, key);
     }
-    a.add(geo, this._x(matrix), opts);
+    let a = this._static.get(sk);
+    if (!a) {
+      a = new Accum(`world:${sk}`);
+      this._static.set(sk, a);
+    }
+    a.add(geo, wm, opts);
     return this;
   }
 
@@ -335,15 +364,16 @@ export class Assembler {
   /** Build the meshes, add them to `root`, register collision with physics. */
   finalize(root, physics) {
     // --- merged static geometry ---
-    for (const [key, acc] of this._static) {
+    for (const [sk, acc] of this._static) {
       if (acc.empty) continue;
+      const paletteKey = this._staticMeta.get(sk) ?? sk;
       const geo = acc.build();
-      const mesh = new THREE.Mesh(geo, this.mat(key));
-      mesh.name = `world_${key}`;
-      mesh.castShadow = true;
+      const mesh = new THREE.Mesh(geo, this.mat(paletteKey));
+      mesh.name = `world_${paletteKey}`;
+      mesh.castShadow = !this.noStaticShadows;
       mesh.receiveShadow = true;
       mesh.matrixAutoUpdate = false;
-      mesh.userData.surface = this.surfaceOf(key);
+      mesh.userData.surface = this.surfaceOf(paletteKey);
       mesh.userData.collision = false; // proxies own collision
       mesh.updateMatrix();
       root.add(mesh);
@@ -360,11 +390,12 @@ export class Assembler {
         continue;
       }
       const buckets = new Map();
+      const effectiveChunk = this.mobileInstChunk > 0 ? this.mobileInstChunk : CHUNK;
       if (p.chunk && n > 24) {
         for (let i = 0; i < n; i++) {
           const m = p.matrices[i];
-          const gx = Math.floor(m.elements[12] / CHUNK);
-          const gz = Math.floor(m.elements[14] / CHUNK);
+          const gx = Math.floor(m.elements[12] / effectiveChunk);
+          const gz = Math.floor(m.elements[14] / effectiveChunk);
           const k = gx * 97 + gz;
           let b = buckets.get(k);
           if (!b) buckets.set(k, (b = []));
