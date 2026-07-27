@@ -17,7 +17,7 @@ import { createComposite, createFxaa, createDebug, createViewComposite } from '.
 import { buildFallbackEnvironment } from './env.js';
 import { RenderProbeScene } from './probe.js';
 
-const QUALITY_LEVEL = { low: 0, medium: 1, high: 2, ultra: 3 };
+const QUALITY_LEVEL = { mobile: -1, low: 0, medium: 1, high: 2, ultra: 3 };
 
 /**
  * Registration range at or below which a punctual light counts as a room/street
@@ -192,6 +192,7 @@ export class RenderSystem {
     this.patcher = new MaterialPatcher(this.csm.uniforms, {
       cascades: this.csm.cascades,
       quality: this.qLevel,
+      use2D: this.csm.use2D,
     });
 
     this.gbuffer = new GBuffer();
@@ -202,8 +203,9 @@ export class RenderSystem {
     this.motionBlur = q.motionBlur ? new MotionBlur() : null;
     // ADS depth of field. Cheap (half-res gather, 32 taps) and only ever runs
     // while the sights are actually up, so it costs nothing in hipfire.
-    this.dof = this.qLevel >= 1 ? new DepthOfField() : null;
-    this.bloom = q.bloom ? new Bloom(this.qLevel >= 2 ? 6 : 5) : null;
+    // Disabled on mobile: no prepass means no depth buffer to drive it.
+    this.dof = this.qLevel >= 1 && !q.skipPrepass ? new DepthOfField() : null;
+    this.bloom = q.bloom ? new Bloom(this.qLevel >= 2 ? 6 : this.qLevel >= 0 ? 5 : 4) : null;
     this.exposure = new AutoExposure();
     // Headroom for a physically-scaled sky (sunlit scenes reach ~5000 cd/m2).
     // The lower limit is the night exposure lock: a moonlit street meters at
@@ -215,14 +217,15 @@ export class RenderSystem {
     this.composite = createComposite(this.lut);
     this.viewComposite = createViewComposite();
     this.fxaa = q.taa ? null : createFxaa();
+    this._isMobile = !!q.skipPrepass;
     // MSAA on the viewmodel target only. It is the one buffer whose geometric
     // edges no longer get a temporal filter, and 4x on a single small pass is
     // far cheaper than any spatial substitute at the same quality.
     this._viewSamples = this.qLevel >= 2 ? 4 : this.qLevel >= 1 ? 2 : 0;
 
-    // Always on: depthTexture/velocityTexture are part of the public contract
-    // (soft particles, SSR, motion blur) even when our own effects are off.
-    this.needsPrepass = true;
+    // On mobile we skip the full MRT prepass — no TAA, SSR, GTAO, contact or DOF
+    // means nothing reads the depth/velocity/normal buffers.
+    this.needsPrepass = !q.skipPrepass;
 
     this.hdrRt = null;
     this.viewRt = null;
@@ -241,6 +244,14 @@ export class RenderSystem {
     this._ambLevel = 0.6;
     this._roomsReady = false;
     this._skyExposureBias = 0;
+
+    // Dynamic resolution for mobile: track frame times and adjust renderScale.
+    this._drsEnabled = this._isMobile;
+    this._drsScale = q.renderScale;
+    this._drsFrameTimes = new Float32Array(16);
+    this._drsFrameIdx = 0;
+    this._cssWidth = 0;
+    this._cssHeight = 0;
 
     // ---- lighting defaults ------------------------------------------------
     // The sky subsystem normally owns the sun. Until it does, we provide one
@@ -457,6 +468,23 @@ export class RenderSystem {
       sunSoftness: 0.024,
     };
     this._applySettings();
+
+    // Mobile: strip expensive lens effects to save fragment bandwidth.
+    if (this._isMobile) {
+      this.settings.chromatic = 0;
+      this.settings.grain = 0;
+      this.settings.vignette = 0.1;
+      this.settings.adsVignette = 0.15;
+      this.settings.sharpen = 0;
+      this._applySettings();
+      // Without a depth prepass there is no depth texture to identify and
+      // de-weight sky pixels in the luminance meter. The sky is tens to hundreds
+      // of times brighter than any ground surface, so without this guard it
+      // dominates the log-average and the exposure collapses to near zero for
+      // everything below the horizon. Cap each metering tap so the sky
+      // contributes no more than a bright lit surface.
+      this.exposure.logPass.uniforms.uMeter.value.z = 1.5;
+    }
 
     this.probe = new RenderProbeScene(this.rng.fork());
     this.probeActive = false;
@@ -866,6 +894,8 @@ export class RenderSystem {
   // ==========================================================================
 
   resize(w, h, ctx) {
+    this._cssWidth = w;
+    this._cssHeight = h;
     const pr = Math.min(globalThis.devicePixelRatio || 1, 1.5);
     this.renderer.setPixelRatio(pr);
     this.renderer.setSize(w, h, false);
@@ -1270,6 +1300,24 @@ export class RenderSystem {
     const dt = Math.min(0.1, Math.max(1 / 480, ctx.time.dt || 1 / 60));
     this.frame++;
     renderer.info.reset();
+
+    // Dynamic resolution scaling (mobile only): adjust renderScale to hit 30fps.
+    if (this._drsEnabled && this.frame > 30 && this._cssWidth > 0) {
+      const buf = this._drsFrameTimes;
+      buf[this._drsFrameIdx++ % buf.length] = dt * 1000;
+      if (this._drsFrameIdx % buf.length === 0) {
+        const avg = buf.reduce((a, b) => a + b, 0) / buf.length;
+        if (avg > 40 && this._drsScale > 0.3) {
+          this._drsScale = Math.max(0.3, this._drsScale - 0.05);
+          this.q.renderScale = this._drsScale;
+          this.resize(this._cssWidth, this._cssHeight, ctx);
+        } else if (avg < 25 && this._drsScale < 0.7) {
+          this._drsScale = Math.min(0.7, this._drsScale + 0.05);
+          this.q.renderScale = this._drsScale;
+          this.resize(this._cssWidth, this._cssHeight, ctx);
+        }
+      }
+    }
 
     camera.updateMatrixWorld();
     viewCamera.updateMatrixWorld();

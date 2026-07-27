@@ -31,7 +31,7 @@ export class MaterialPatcher {
   constructor(csmUniforms, opts) {
     this.cascades = opts.cascades;
     this.quality = opts.quality;
-    this.key = `ow-patch-${PATCH_VERSION}-${opts.cascades}-${opts.quality}`;
+    this.key = `ow-patch-${PATCH_VERSION}-${opts.cascades}-${opts.quality}${opts.use2D ? '-2d' : ''}`;
 
     this.uniforms = {
       ...csmUniforms,
@@ -67,7 +67,7 @@ export class MaterialPatcher {
       owRoomsY: { value: makeVec4Array(MAX_ROOMS) },
     };
 
-    this.chunk = csmShaderChunk(opts.cascades, opts.quality);
+    this.chunk = csmShaderChunk(opts.cascades, opts.quality, opts.use2D ?? false);
     this.rooms = this.uniforms.owRooms.value;
     this.roomsY = this.uniforms.owRoomsY.value;
     this._patched = new WeakSet();

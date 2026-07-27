@@ -58,8 +58,9 @@ export class AiSystem {
     ctx.scene.add(this.root);
 
     const t0 = performance.now();
+    const isMobileQ = ctx.config.quality === 'mobile';
     this.materials = new SoldierMaterials(this.rng.fork(), {
-      size: 512,
+      size: isMobileQ ? 128 : 512,
       anisotropy: ctx.config.q.anisotropy ?? 8,
       camo: ['arid', 'woodland', 'urban'],
     });
@@ -161,7 +162,13 @@ export class AiSystem {
   _bootNav(ctx) {
     try {
       this._buildNav();
-      if (!this._navPending && (!ctx.config.deterministic || this.forcePopulate)) this.populate();
+      if (!this._navPending && (!ctx.config.deterministic || this.forcePopulate)) {
+        const maxEnemies = ctx.config.q?.maxEnemies;
+        const populateOpts = maxEnemies != null
+          ? { squads: 1, perSquad: Math.min(maxEnemies, 4) }
+          : {};
+        this.populate(populateOpts);
+      }
     } catch (err) {
       this._navPending = true;
       console.warn('[ai] boot nav deferred to the first frame:', err?.message ?? err);
@@ -726,7 +733,13 @@ export class AiSystem {
       // Populate the level for normal play. Capture runs stay empty unless a
       // shot asks for a tableau, so nobody's screenshot gets a stray patrol
       // wandering through it.
-      if (!this._navPending && (!ctx.config.deterministic || this.forcePopulate)) this.populate();
+      if (!this._navPending && (!ctx.config.deterministic || this.forcePopulate)) {
+        const maxEnemies = ctx.config.q?.maxEnemies;
+        const populateOpts = maxEnemies != null
+          ? { squads: 1, perSquad: Math.min(maxEnemies, 4) }
+          : {};
+        this.populate(populateOpts);
+      }
     }
 
     // Per-frame A* budget: see requestPath().

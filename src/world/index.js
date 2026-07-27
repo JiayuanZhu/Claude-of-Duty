@@ -106,6 +106,8 @@ export class WorldSystem {
     const A = new Assembler({ materials, rng, render });
     this.A = A;
     A.setTransform(LEVEL_YAW, LEVEL_TX, LEVEL_TZ);
+    const isMobile = ctx?.config?.q?.reducedProps;
+    if (isMobile) A.density = 0.25;
 
     // 1. prototypes first: the level references them by id while it builds
     registerProps(A, rng);
@@ -131,7 +133,7 @@ export class WorldSystem {
     buildPerimeter(A, rng);
     dressStreet(A, rng);
     dressBuildings(A, rng, infos);
-    scatterDebris(A, rng);
+    if (!isMobile) scatterDebris(A, rng);
 
     this._addLights(A);
 

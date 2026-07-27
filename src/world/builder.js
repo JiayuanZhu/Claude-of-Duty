@@ -76,6 +76,12 @@ export class Assembler {
      * not on the ground, and a dust ring floating at 60 cm is worse than none.
      */
     this.skirts = true;
+    /**
+     * Mobile density throttle (0..1). When < 1, each put() call has a chance
+     * of being skipped to reduce total instance count. Keyed off the Assembler's
+     * own RNG so the remaining props still form a spatially coherent layout.
+     */
+    this.density = 1;
     this.stats = { staticTris: 0, instTris: 0, instances: 0, drawCalls: 0, collideTris: 0 };
   }
 
@@ -237,6 +243,7 @@ export class Assembler {
    * plumb, and two barrels are never the same size.
    */
   put(id, x, y, z, ry = 0, s = 1, masks = null, rx = 0, rz = 0) {
+    if (this.density < 1 && this.rng.float() >= this.density) return this;
     const j = this.jitter;
     const p = this._protos.get(id);
     if (j) {

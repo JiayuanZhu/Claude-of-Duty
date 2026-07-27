@@ -1,10 +1,11 @@
 /**
- * Input aggregation: keyboard, mouse (pointer-locked), and gamepad, exposed as
- * a stable per-frame snapshot so gameplay never touches raw DOM events.
+ * Input aggregation: keyboard, mouse (pointer-locked), gamepad, and touch,
+ * exposed as a stable per-frame snapshot so gameplay never touches raw DOM events.
  *
  * Edge queries (`pressed`, `released`) are valid only during the frame in which
  * the transition happened — read them in update(), not fixedUpdate().
  */
+import { TouchInput } from './touch-input.js';
 
 export const ACTIONS = {
   forward: ['KeyW', 'ArrowUp'],
@@ -51,6 +52,9 @@ export class Input {
     this.gamepadIndex = null;
     this.stick = { moveX: 0, moveY: 0, lookX: 0, lookY: 0 };
 
+    /** Touch input controller (mobile only, created lazily on first attach). */
+    this._touch = null;
+
     this._bound = {
       keydown: this._onKeyDown.bind(this),
       keyup: this._onKeyUp.bind(this),
@@ -74,6 +78,11 @@ export class Input {
     addEventListener('blur', this._bound.blur);
     document.addEventListener('pointerlockchange', this._bound.lockchange);
     this.canvas.addEventListener('contextmenu', this._bound.contextmenu);
+
+    // Activate touch controls on mobile devices
+    if (window.__IS_MOBILE__) {
+      this._touch = new TouchInput(this);
+    }
   }
 
   detach() {
@@ -86,9 +95,13 @@ export class Input {
     removeEventListener('blur', this._bound.blur);
     document.removeEventListener('pointerlockchange', this._bound.lockchange);
     this.canvas.removeEventListener('contextmenu', this._bound.contextmenu);
+    this._touch?.dispose();
+    this._touch = null;
   }
 
   requestPointerLock() {
+    // Mobile browsers don't support pointer lock; touch input drives look instead.
+    if (window.__IS_MOBILE__) return;
     // Chrome returns a promise that rejects if the document is not eligible
     // (headless capture, an iframe, a lock request too soon after an exit).
     // An unhandled rejection there shows up as a page error in the harness, so
@@ -174,6 +187,8 @@ export class Input {
     this.wheel = this._pendingWheel;
     this._pendingWheel = 0;
 
+    // Touch must flush before _pollGamepad so gamepad can override on dual-input devices.
+    if (this._touch) this._touch.flush();
     this._pollGamepad();
   }
 

@@ -19,6 +19,26 @@ export const UNITS = {
 };
 
 export const QUALITY_PRESETS = {
+  mobile: {
+    renderScale: 0.5,
+    shadowMapSize: 512,
+    cascades: 1,
+    shadowDistance: 30,
+    taa: false,
+    gtao: false,
+    ssr: false,
+    volumetrics: false,
+    motionBlur: false,
+    bloom: true,
+    anisotropy: 2,
+    particleBudget: 500,
+    decalBudget: 16,
+    // mobile-specific flags
+    skipPrepass: true,
+    reducedProps: true,
+    maxEnemies: 4,
+    physicsHz: 60,
+  },
   low: {
     renderScale: 0.72,
     shadowMapSize: 1024,

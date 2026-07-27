@@ -42,17 +42,34 @@ export class CascadedShadowMaps {
     this.backDistance = 140;
     this.enabled = true;
 
-    this.rt = new THREE.WebGLArrayRenderTarget(this.mapSize, this.mapSize, this.cascades, {
-      type: THREE.FloatType,
-      format: THREE.RedFormat,
-      minFilter: THREE.NearestFilter,
-      magFilter: THREE.NearestFilter,
-      wrapS: THREE.ClampToEdgeWrapping,
-      wrapT: THREE.ClampToEdgeWrapping,
-      depthBuffer: true,
-      stencilBuffer: false,
-      generateMipmaps: false,
-    });
+    // Single-cascade mobile path: use a plain 2D render target to avoid the
+    // sampler2DArray requirement (more compatible with iOS WebGL2 drivers).
+    this.use2D = this.cascades === 1;
+    if (this.use2D) {
+      this.rt = new THREE.WebGLRenderTarget(this.mapSize, this.mapSize, {
+        type: THREE.HalfFloatType,
+        format: THREE.RedFormat,
+        minFilter: THREE.NearestFilter,
+        magFilter: THREE.NearestFilter,
+        wrapS: THREE.ClampToEdgeWrapping,
+        wrapT: THREE.ClampToEdgeWrapping,
+        depthBuffer: true,
+        stencilBuffer: false,
+        generateMipmaps: false,
+      });
+    } else {
+      this.rt = new THREE.WebGLArrayRenderTarget(this.mapSize, this.mapSize, this.cascades, {
+        type: THREE.FloatType,
+        format: THREE.RedFormat,
+        minFilter: THREE.NearestFilter,
+        magFilter: THREE.NearestFilter,
+        wrapS: THREE.ClampToEdgeWrapping,
+        wrapT: THREE.ClampToEdgeWrapping,
+        depthBuffer: true,
+        stencilBuffer: false,
+        generateMipmaps: false,
+      });
+    }
     this.rt.texture.name = 'csm';
 
     this.cameras = [];
@@ -344,7 +361,11 @@ export class CascadedShadowMaps {
     for (let i = 0; i < this.cascades; i++) {
       const kept = casters === null ? -1 : this._cullCascade(i, casters, nCasters);
       this.casterCounts[i] = kept;
-      renderer.setRenderTarget(this.rt, i);
+      if (this.use2D) {
+        renderer.setRenderTarget(this.rt);
+      } else {
+        renderer.setRenderTarget(this.rt, i);
+      }
       renderer.clear(true, true, false);
       if (kept !== 0) renderer.render(scene, this.cameras[i]);
       else this.emptyCascades++;
@@ -455,21 +476,28 @@ export class CascadedShadowMaps {
 /**
  * GLSL injected into every lit material. Declares the CSM uniforms and the
  * `owSunShadow()` entry point used inside the directional-light loop.
+ * When `use2D` is true, a plain sampler2D is used instead of sampler2DArray
+ * (single-cascade mobile path, avoids the array extension requirement).
  */
-export function csmShaderChunk(cascades, quality) {
+export function csmShaderChunk(cascades, quality, use2D = false) {
   const blockerTaps = quality >= 3 ? 16 : quality >= 2 ? 12 : 8;
   const pcfTaps = quality >= 3 ? 20 : quality >= 2 ? 14 : 8;
   const pcss = quality >= 2;
 
-  // Sampler-array-free: one 2D array texture, so the layer index can be
-  // dynamic. No unrolling needed.
+  const samplerDecl = use2D
+    ? 'uniform highp sampler2D owCsmMaps;'
+    : 'uniform highp sampler2DArray owCsmMaps;';
+  const tapImpl = use2D
+    ? 'float owCsmTap( float layer, vec2 uv ) { return texture2D( owCsmMaps, uv ).r; }'
+    : 'float owCsmTap( float layer, vec2 uv ) { return texture( owCsmMaps, vec3( uv, layer ) ).r; }';
+
   return /* glsl */ `
 #define OW_CASCADES ${cascades}
 #define OW_BLOCKER_TAPS ${blockerTaps}
 #define OW_PCF_TAPS ${pcfTaps}
 ${pcss ? '#define OW_PCSS 1' : ''}
 
-uniform highp sampler2DArray owCsmMaps;
+${samplerDecl}
 uniform mat4 owCsmMatrix[ OW_CASCADES ];
 uniform vec4 owCsmSplit;
 uniform vec4 owCsmSplitNear;
@@ -490,9 +518,7 @@ vec2 owVogel( int i, int n, float phi ) {
   return vec2( cos( theta ), sin( theta ) ) * r;
 }
 
-float owCsmTap( float layer, vec2 uv ) {
-  return texture( owCsmMaps, vec3( uv, layer ) ).r;
-}
+${tapImpl}
 
 float owCsmCascade( int c, vec3 wPos, vec3 wN, float NdL, float rot ) {
   float texelWorld = owCsmTexel[ c ];

@@ -24,8 +24,12 @@ const capture = params.get('capture') === '1';
 // free-run. See the long comment in src/dev/shots.js.
 const lockstep = capture && params.get('lockstep') === '1';
 
+const isMobile = /Mobi|Android|iPhone/i.test(navigator.userAgent) ||
+  ('ontouchstart' in window && window.innerWidth < 1024);
+window.__IS_MOBILE__ = isMobile;
+
 const config = createConfig({
-  quality: params.get('q') ?? 'ultra',
+  quality: params.get('q') ?? (isMobile ? 'mobile' : 'ultra'),
   deterministic: capture,
 });
 
